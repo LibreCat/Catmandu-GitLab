@@ -1,35 +1,66 @@
 package Catmandu::Store::File::GitLab::Index;
 
 use Catmandu::Sane;
-use Moo;
 use Carp;
-use Clone qw(clone);
+use Furl;
+use Moo;
+use URL::Encode qw(url_encode);
 use namespace::clean;
 
-with 'Catmandu::Bag', 'Catmandu::FileBag::Index', 'Catmandu::Droppable';
+with 'Catmandu::Bag';
+with 'Catmandu::FileBag::Index';
+with 'Catmandu::Droppable';
 
 sub generator {
     my ($self) = @_;
 
     my $gitlab = $self->store->gitlab;
 
+    $self->log->debug(
+        "Creating generator for GitLab @ " . $self->store->baseurl);
+
+    return sub {
+        state $projects = $gitlab->paginator('owned_projects');
+
+        while (my $project = $projects->next()) {
+
+            return {_id => $project->{path_with_namespace},};
+        }
+
+        return undef;
+
+    };
 }
 
 sub exists {
     my ($self, $key) = @_;
 
     croak "Need a key" unless defined $key;
-    my $gitlab = $self->gitlab;
 
-    $self->log->debug("Checking exists $key");
+    $self->log->debug("Checking if repo exists with name $key");
 
-    my $repo = $gitlab->project($key);
+    my $repo = $self->get($key);
 
     $repo->{name} ? 1 : 0;
 }
 
 sub add {
     my ($self, $data) = @_;
+
+    croak "Need a '_id' field" unless defined $data->{_id};
+
+    my $gitlab = $self->store->gitlab;
+
+    $self->log->debug("Creating repo with name $data->{_id}");
+
+    if (!$self->exists($data->{_id})) {
+        my $data = $gitlab->create_project({name => $data->{_id}});
+        $data->{_id} = $data->{name};
+        $data;
+    }
+    else {
+        $self->get($data->{_id});
+    }
 }
 
 sub get {
@@ -37,32 +68,56 @@ sub get {
 
     croak "Need a key" unless defined $key;
 
-    my $gitlab = $self->gitlab;
+    my $gitlab = $self->store->gitlab;
 
-    $self->log->debug("Loading container for $key");
+    $self->log->debug("Loading repo with name $key");
 
+    my $repo_id = $self->store->user . "/" . $key;
+    url_encode($repo_id);
+    my $project = $gitlab->project($repo_id);
 
+    $project->{_id} = $project->{name};
+
+    return $project;
 }
 
 sub delete {
     my ($self, $key) = @_;
-    croak "Not implemented";
+
+    croak "Need a key" unless defined $key;
+
+    my $gitlab = $self->store->gitlab;
+
+    $self->log->debug("Deleting repo with name $key");
+
+    my $repo_id = $self->store->user . "/" . $key;
+    url_encode($repo_id);
+    my $res = $gitlab->delete_project($repo_id);
+
+    1;
 }
 
 sub delete_all {
     my ($self) = @_;
-    croak "Not implemented";
-    # $self->each(
-    #     sub {
-    #         my $key = shift->{_id};
-    #         $self->delete($key);
-    #     }
-    # );
+
+    $self->log->debug("Start delete_all for for store gitlab");
+
+    $self->each(
+        sub {
+            my $key = shift->{_id};
+            $self->delete($key);
+        }
+    );
+
+    1;
 }
 
 sub drop {
-    # $_[0]->delete_all;
-    croak "Not implemented";
+    my ($self) = @_;
+
+    $self->log->debug("Dropping store gitlab");
+
+    $self->delete_all;
 }
 
 sub commit {
@@ -77,7 +132,7 @@ __END__
 
 =head1 NAME
 
-Catmandu::Store::File::FedoraCommons::Index - Index of all "Folders" in a Catmandu::Store::File::FedoraCommons
+Catmandu::Store::File::GitLab::Index - Index of all repostories in a Catmandu::Store::File::GitLab
 
 =head1 SYNOPSIS
 
@@ -85,30 +140,29 @@ Catmandu::Store::File::FedoraCommons::Index - Index of all "Folders" in a Catman
 
     my $store = Catmandu->store('File::GitLab'
                         , baseurl   => 'http://localhost:8080/gitlab'
-                        , username  => 'fedoraAdmin'
-                        , password  => 'fedoraAdmin'
-                        , namespace => 'demo'
-                        , purge     => 1);
+                        , username  => 'userX'
+                        , token  => '12345'
+                        );
 
     my $index = $store->index;
 
-    # List all containers
+    # List all repositories
     $index->each(sub {
-        my $container = shift;
+        my $repo = shift;
 
-        print "%s\n" , $container->{_id};
+        print "%s\n" , $repo->{_id};
     });
 
-    # Add a new folder
+    # Create a new repository
     $index->add({_id => '1234'});
 
-    # Delete a folder
+    # Delete a repository
     $index->delete(1234);
 
-    # Get a folder
-    my $folder = $index->get(1234);
+    # Get a repository
+    my $repo = $index->get(1234);
 
-    # Get the files in an folder
+    # Get the files in a repository
     my $files = $index->files(1234);
 
     $files->each(sub {
@@ -135,31 +189,31 @@ Catmandu::Store::File::FedoraCommons::Index - Index of all "Folders" in a Catman
     # Delete a file
     $files->delete("data.dat");
 
-    # Delete a folders
+    # Delete a repository
     $index->delete("1234");
 
 =head1 DESCRIPTION
 
-A L<Catmandu::Store::File::FedoraCommons::Index> contains all "folders" available in a
-L<Catmandu::Store::File::FedoraCommons> FileStore. All methods of L<Catmandu::Bag>,
+A L<Catmandu::Store::File::GitLab::Index> contains all repositories available in a
+L<Catmandu::Store::File::GitLab> FileStore. All methods of L<Catmandu::Bag>,
 L<Catmandu::FileBag::Index> and L<Catmandu::Droppable> are
 implemented.
 
 Every L<Catmandu::Bag> is also an L<Catmandu::Iterable>.
 
-=head1 FOLDERS
+=head1 Repositories
 
-All files in a L<Catmandu::Store::File::FedoraCommons> are organized in "folders". To add
-a "folder" a new record needs to be added to the L<Catmandu::Store::File::FedoraCommons::Index> :
+All files in a L<Catmandu::Store::File::GitLab> are organized in repositories. To add
+a repository a new record needs to be added to the L<Catmandu::Store::File::GitLab::Index> :
 
     $index->add({_id => '1234'});
 
-The C<_id> field is the only metadata available in FedoraCommons stores. To add more
-metadata fields to a FedoraCommons store a L<Catmandu::Plugin::SideCar> is required.
+The C<_id> field is the only metadata available in GitLab stores. To add more
+metadata fields to a GitLab store a L<Catmandu::Plugin::SideCar> is required.
 
 =head1 FILES
 
-Files can be accessed via the "folder" identifier:
+Files can be accessed via the repository identifier:
 
     my $files = $index->files('1234');
 
@@ -176,30 +230,30 @@ to retrieve files from a "folder".
 
 =head2 each(\&callback)
 
-Execute C<callback> on every "folder" in the FedoraCommons store. See L<Catmandu::Iterable> for more
+Execute C<callback> on every repository in the GitLab store. See L<Catmandu::Iterable> for more
 iterator functions
 
 =head2 exists($id)
 
-Returns true when a "folder" with identifier $id exists.
+Returns true when a repository with identifier $id exists.
 
 =head2 add($hash)
 
-Adds a new "folder" to the FedoraCommons store. The $hash must contain an C<_id> field.
+Adds a new repository to the GitLab store. The $hash must contain an C<_id> field.
 
 =head2 get($id)
 
-Returns a hash containing the metadata of the folder. In the FedoraCommons store this hash
-will contain only the "folder" idenitifier.
+Returns a hash containing the metadata of the repository. In the GitLab store this hash
+will contain only the repository idenitifier.
 
 =head2 files($id)
 
-Return the L<Catmandu::Store::File::FedoraCommons::Bag> that contains all "files" in the "folder"
+Return the L<Catmandu::Store::File::GitLab::Bag> that contains all "files" in the repository
 with identifier $id.
 
 =head2 delete($id)
 
-Delete the "folder" with identifier $id, if exists.
+Delete the repository with identifier $id, if exists.
 
 =head2 delete_all()
 
@@ -211,8 +265,8 @@ Delete the store.
 
 =head1 SEE ALSO
 
-L<Catmandu::Store::File::FedoraCommons::Bag> ,
-L<Catmandu::Store::File::FedoraCommons> ,
+L<Catmandu::Store::File::GitLab::Bag> ,
+L<Catmandu::Store::File::GitLab> ,
 L<Catmandu::FileBag::Index> ,
 L<Catmandu::Plugin::SideCar> ,
 L<Catmandu::Bag> ,

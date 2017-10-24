@@ -1,29 +1,35 @@
 use strict;
-use warnings;
+use warnings FATAL => 'all';
 use Test::More;
 use Test::Exception;
-use Catmandu::Store::File::FedoraCommons;
+use Catmandu::Store::File::GitLab;
+use Data::Dumper;
 
-my $host = $ENV{FEDORA_HOST} || "";
-my $port = $ENV{FEDORA_PORT} || "";
-my $user = $ENV{FEDORA_USER} || "";
-my $pwd  = $ENV{FEDORA_PWD}  || "";
+my $baseurl = $ENV{GITLAB_URL}     || "";
+my $token   = $ENV{GITLAB_TOKEN}   || "";
+my $username = $ENV{GITLAB_USER} || "";
 
 my $pkg;
 
 BEGIN {
-    $pkg = 'Catmandu::Store::File::FedoraCommons::Index';
+    $pkg = 'Catmandu::Store::File::GitLab::Index';
     use_ok $pkg;
 }
 require_ok $pkg;
 
 SKIP: {
-    skip "No Fedora server environment settings found (FEDORA_HOST,"
-	 . "FEDORA_PORT,FEDORA_USER,FEDORA_PWD).",
-	100 if (! $host || ! $port || ! $user || ! $pwd);
+    skip
+        "No GitLab server environment settings found (GITLAB_URL, GITLAB_TOKEN, GITLAB_USER).",
+        5
+        if (!$baseurl || !$token || !$username);
 
-    my $store
-        = Catmandu::Store::File::FedoraCommons->new(purge => 1);
+    my $testrepo = "testproject2";
+
+    my $store = Catmandu::Store::File::GitLab->new(
+        baseurl => $baseurl,
+        token   => $token,
+        user    => $username,
+    );
 
     ok $store , 'got a store';
 
@@ -41,25 +47,45 @@ SKIP: {
         my $array = $index->to_array;
 
         ok $array , 'list got a response';
-
-        ok grep({ $_->{_id} eq 'SmileyWastebasket' } @$array), 'got a SmileyWastebasket';
+        is @$array, 0, "list gives empty array"
     }
 
-    note("get");
+    note("exists");
     {
-        for (qw(SmileyToiletBrush SmileyTallRoundCup SmileyWastebasket)) {
-            ok $index->get($_), "get($_)";
-        }
+        my $exists = $index->exists($testrepo);
+        is $exists, 0, "check repo does not exist";
     }
 
     note("add");
     {
-        ok $index->add({_id => '1234'}) , 'add(1234)';
+        ok my $new = $index->add({_id => $testrepo}), "create repo";
+        is $new->{_id}, $testrepo, "correct repo created";
+
+        my $exists = $index->exists($testrepo);
+        is $exists, 1, "check if repo exists";
+
+        my $array = $index->to_array;
+        ok $array , 'list got a response';
+        is @$array, 1, "list gives one record"
+    }
+
+    note("get");
+    {
+        ok my $repo = $index->get($testrepo), "get added repo";
+        is $repo->{_id}, $testrepo, "get correct repo after add";
     }
 
     note("delete");
     {
-        ok $index->delete('1234'), 'delete(1234)';
+        ok my $res = $index->delete($testrepo), 'delete our test repo';
+
+        sleep 2;
+        ok my $repo = $index->get($testrepo), "get added repo";
+        ok ! $repo->{_id}, "nothing to get";
+
+        my $array = $index->to_array;
+        ok $array , 'list got a response after delete';
+        is @$array, 0, "list gives empty array after delete"
     }
 }
 
