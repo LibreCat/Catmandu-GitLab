@@ -8,8 +8,12 @@ on 'test', sub {
 };
 
 requires 'Catmandu', '1.06';
+requires 'Furl', '3.13';
 requires 'GitLab::API::v3', '1.00';
 requires 'Test::JSON', '0.11';
+requires 'URL::Encode', '0.03';
+requires 'IO::File';
+requires 'IO::File::WithFilename';
 
 # Need recent SSL to talk to https endpoint correctly
 requires 'IO::Socket::SSL', '2.015';

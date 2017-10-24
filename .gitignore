@@ -1,8 +1,12 @@
-/Catmandu-GitLab-*
+!META.json
 /.build
-/_build*
+/.prove
 /Build
+/Catmandu-GitLab-*
+/_build*
 /local/*
 MYMETA.*
-!META.json
-/.prove
+cpanfile.snapshot
+export.sh
+gitlab.json
+/.tidyall.d/*
