@@ -1,29 +1,28 @@
 package Catmandu::Store::File::GitLab;
 
 use Catmandu::Sane;
-use Moo;
-use Carp;
 use Catmandu;
-use GitLab::API::v3;
-use Catmandu::Store::File::GitLab::Index;
 use Catmandu::Store::File::GitLab::Bag;
+use Catmandu::Store::File::GitLab::Index;
+use GitLab::API::v3;
+use Moo;
 use namespace::clean;
 
 with 'Catmandu::FileStore', 'Catmandu::Droppable';
 
-has baseurl     => (is => 'ro', default => sub {'http://localhost:8080/fedora'});
-has token => (is => 'ro', default => sub {'s3cret'});
-has gitlab => (is => 'lazy');
+has baseurl => (
+    is      => 'ro',
+    default => sub {'https://gitlab.ub.uni-bielefeld.de/api/v3'}
+);
+has token     => (is => 'ro', required => 1);
+has user => (is => 'ro', required => 1);
+has gitlab    => (is => 'lazy');
 
 sub _build_gitlab {
     my ($self) = @_;
 
-    GitLab::API::v3->new(
-        url   => $self->baseurl,
-        token => $self->token,
-    );
+    GitLab::API::v3->new(url => $self->baseurl, token => $self->token,);
 }
-
 
 sub drop {
     my ($self) = @_;

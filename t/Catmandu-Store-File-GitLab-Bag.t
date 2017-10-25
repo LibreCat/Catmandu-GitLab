@@ -6,8 +6,9 @@ use IO::File;
 use IO::File::WithFilename;
 use Catmandu::Store::File::GitLab;
 
-my $baseurl = $ENV{GITLAB_URL} || "";
-my $token = $ENV{GITLAB_TOKEN} || "";
+my $baseurl = $ENV{GITLAB_URL}     || "";
+my $token   = $ENV{GITLAB_TOKEN}   || "";
+my $username = $ENV{GITLAB_USER} || "";
 
 my $pkg;
 
@@ -18,9 +19,16 @@ BEGIN {
 require_ok $pkg;
 
 SKIP: {
-    skip "No GitLab server environment settings found (GITLAB_URL, GITLAB_TOKEN).", 5 if (! $host || ! $token);
+    skip
+        "No GitLab server environment settings found (GITLAB_URL, GITLAB_TOKEN, GITLAB_USER).",
+        5
+        if (!$baseurl || !$token || !$username);
 
-    my $store = Catmandu::Store::File::GitLab->new();
+    my $store = Catmandu::Store::File::GitLab->new(
+        baseurl => $baseurl,
+        token   => $token,
+        user    => $username,
+    );
 
     ok $store , 'got a store';
 
@@ -36,41 +44,37 @@ SKIP: {
 
     note("add");
     {
-        ok $bag->upload(IO::File::WithFilename->new('t/marc.xml'),'marc.xml');
-
-        ok $bag->upload(IO::File->new('t/obj_demo_40.zip'),'obj_demo_40.zip');
+        ok $bag->upload(IO::File->new('t/marc.xml'),
+            'marc.xml');
     }
-
     note("list");
     {
         my $array = [sort @{$bag->map(sub {shift->{_id}})->to_array}];
 
         ok $array , 'list got a response';
 
-        is_deeply $array , [qw(marc.xml obj_demo_40.zip)],
+        is_deeply $array , [qw(marc.xml)],
             'got correct response';
     }
 
     note("exists");
     {
-        for (qw(marc.xml obj_demo_40.zip)) {
-            ok $bag->exists($_), "exists($_)";
-        }
+        is $bag->exists("marc.xml"), 1, "file exists";
+
+        is $bag->exists->("Idonotexist.txt"), 0, "file does not exist";
     }
 
     note("get");
     {
-        for (qw(marc.xml obj_demo_40.zip)) {
-            ok $bag->get($_), "get($_)";
-        }
-
         my $file = $bag->get("marc.xml");
+        ok $file;
 
-        my $str  = $bag->as_string_utf8($file);
+        my $str = $bag->as_string_utf8($file);
 
         ok $str , 'can stream the data';
 
-        like $str , qr/Carl Sandburg ; illustrated as an anamorphic adventure by Ted Rand./, 'got the correct data';
+        like $str , qr/<\?xml version="1.0"/,
+            'got the correct data';
     }
 
     note("delete");
@@ -84,16 +88,16 @@ SKIP: {
         is_deeply $array , [qw(obj_demo_40.zip)], 'got correct response';
     }
 
-    note("delete_all");
-    {
-        lives_ok {$bag->delete_all()} 'delete_all';
-
-        my $array = $bag->to_array;
-
-        is_deeply $array , [], 'got correct response';
-    }
-
-    ok $index->delete('1234'), 'delete(1234)';
+    # note("delete_all");
+    # {
+    #     lives_ok {$bag->delete_all()} 'delete_all';
+    #
+    #     my $array = $bag->to_array;
+    #
+    #     is_deeply $array , [], 'got correct response';
+    # }
+    #
+    # ok $index->delete('1234'), 'delete(1234)';
 }
 
 done_testing;
