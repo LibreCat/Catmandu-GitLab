@@ -2,26 +2,30 @@ use strict;
 use warnings FATAL => 'all';
 use Test::More;
 use Test::Exception;
+use Data::Dumper;
 
-my $host = $ENV{FEDORA_HOST} || "";
-my $port = $ENV{FEDORA_PORT} || "";
-my $user = $ENV{FEDORA_USER} || "";
-my $pwd  = $ENV{FEDORA_PWD} || "";
+my $baseurl = $ENV{GITLAB_URL}     || "";
+my $token   = $ENV{GITLAB_TOKEN}   || "";
+my $username = $ENV{GITLAB_USER} || "";
 
 my $pkg;
 
 BEGIN {
-    $pkg = 'Catmandu::Store::File::FedoraCommons';
+    $pkg = 'Catmandu::Store::File::GitLab';
     use_ok $pkg;
 }
 require_ok $pkg;
 
 SKIP: {
-    skip "No Fedora server environment settings found (FEDORA_HOST,"
-	 . "FEDORA_PORT,FEDORA_USER,FEDORA_PWD).",
-	100 if (! $host || ! $port || ! $user || ! $pwd);
+    skip
+        "No GitLab server environment settings found (GITLAB_URL, GITLAB_TOKEN, GITLAB_USER).",
+        5
+        if (!$baseurl || !$token || !$username);
 
-    my $store = $pkg->new(purge => 1);
+    dies_ok { $pkg->new() } "missing arguments";
+    lives_ok { $pkg->new(baseurl => $baseurl, token =>$token, user => $username) } "missing arguments";
+
+    my $store = $pkg->new(baseurl => $baseurl, token =>$token, user => $username);
 
     ok $store , 'got a store';
 
@@ -29,19 +33,16 @@ SKIP: {
 
     ok $bags , 'store->bag()';
 
-    isa_ok $bags , 'Catmandu::Store::File::FedoraCommons::Index';
+    isa_ok $bags , 'Catmandu::Store::File::GitLab::Index';
 
-    throws_ok {$store->bag('1235')} 'Catmandu::Error', 'bag(1235) doesnt exist';
-
-    lives_ok {$store->bag('1')} 'bag(1) exists';
+    throws_ok { $store->bag('1235') } 'Catmandu::Error',
+        'bag(1235) doesnt exist';
 
     my $index = $store->index;
 
     ok $index , 'got an index';
 
-    my @bags = [ $index->to_array ];
-
-    ok @bags > 0 , 'got some folders';
+    is_deeply $index->to_array, [], "now repos there";
 }
 
 done_testing;

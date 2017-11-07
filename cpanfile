@@ -8,9 +8,8 @@ on 'test', sub {
 };
 
 requires 'Catmandu', '1.06';
-requires 'Furl', '3.13';
 requires 'GitLab::API::v3', '1.00';
-requires 'Test::JSON', '0.11';
+requires 'MIME::Base64', '3.15';
 requires 'URL::Encode', '0.03';
 requires 'IO::File';
 requires 'IO::File::WithFilename';

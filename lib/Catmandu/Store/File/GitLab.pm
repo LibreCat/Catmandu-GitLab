@@ -10,10 +10,7 @@ use namespace::clean;
 
 with 'Catmandu::FileStore', 'Catmandu::Droppable';
 
-has baseurl => (
-    is      => 'ro',
-    default => sub {'https://gitlab.ub.uni-bielefeld.de/api/v3'}
-);
+has baseurl => (is  => 'ro', required => 1);
 has token     => (is => 'ro', required => 1);
 has user => (is => 'ro', required => 1);
 has gitlab    => (is => 'lazy');
@@ -21,7 +18,10 @@ has gitlab    => (is => 'lazy');
 sub _build_gitlab {
     my ($self) = @_;
 
-    GitLab::API::v3->new(url => $self->baseurl, token => $self->token,);
+    GitLab::API::v3->new(
+        url => $self->baseurl,
+        token => $self->token
+    );
 }
 
 sub drop {

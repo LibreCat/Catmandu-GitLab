@@ -1,3 +1,7 @@
+# WARNING
+
+This is a WIP.
+
 # NAME
 
 Catmandu::GitLab - Blah blah blah

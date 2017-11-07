@@ -2,7 +2,6 @@ package Catmandu::Store::File::GitLab::Index;
 
 use Catmandu::Sane;
 use Carp;
-use Furl;
 use Moo;
 use URL::Encode qw(url_encode);
 use namespace::clean;
@@ -20,11 +19,12 @@ sub generator {
         "Creating generator for GitLab @ " . $self->store->baseurl);
 
     return sub {
-        state $projects = $gitlab->paginator('owned_projects');
+        state $repos = $gitlab->paginator('owned_projects');
 
-        while (my $project = $projects->next()) {
-
-            return {_id => $project->{path_with_namespace},};
+        while (my $repo = $repos->next()) {
+            $repo->{_id} = $repo->{name};
+            # return {_id => $project->{path_with_namespace},};
+            return $repo;
         }
 
         return undef;
@@ -74,11 +74,11 @@ sub get {
 
     my $repo_id = $self->store->user . "/" . $key;
     url_encode($repo_id);
-    my $project = $gitlab->project($repo_id);
+    my $repo = $gitlab->project($repo_id);
 
-    $project->{_id} = $project->{name};
+    $repo->{_id} = $repo->{name};
 
-    return $project;
+    return $repo;
 }
 
 sub delete {

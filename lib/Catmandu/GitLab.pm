@@ -1,29 +1,25 @@
 package Catmandu::GitLab;
 
 use strict;
-use 5.008_005;
+use warnings;
+
 our $VERSION = '0.01';
 
 1;
-__END__
 
 =encoding utf-8
 
 =head1 NAME
 
-Catmandu::GitLab - Blah blah blah
+Catmandu::GitLab - namespace for Catmandu GitLab modules
 
-=head1 SYNOPSIS
+=head1 MODULES
 
-  use Catmandu::GitLab;
-
-=head1 DESCRIPTION
-
-Catmandu::GitLab is
+This package provides modules as for using
 
 =head1 AUTHOR
 
-Vitali Peil E<lt>vitali.peil@uni-bielefeld.deE<gt>
+Vitali Peil E<lt>vitali.peil at uni-bielefeld.deE<gt>
 
 =head1 COPYRIGHT
 
@@ -35,5 +31,7 @@ This library is free software; you can redistribute it and/or modify
 it under the same terms as Perl itself.
 
 =head1 SEE ALSO
+
+L<Catmandu>, L<>
 
 =cut

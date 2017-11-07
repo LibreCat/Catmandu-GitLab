@@ -2,9 +2,10 @@ package Catmandu::Store::File::GitLab::Bag;
 
 use Catmandu::Sane;
 use Carp;
-use JSON;
+use IO::File;
+use MIME::Base64;
 use Moo;
-# use Catmandu::Util qw(content_type);
+use Catmandu::Util qw(content_type);
 use URL::Encode qw(url_encode);
 use namespace::clean;
 
@@ -25,8 +26,7 @@ sub generator {
     return sub {
         while (my $obj = pop @$tree) {
             if ($obj->{id} && $obj->{type} eq "blob") {
-                $obj->{_id} = delete $obj->{name};
-                return $obj;
+                return $self->get($obj->{name});
             }
         }
 
@@ -38,7 +38,7 @@ sub generator {
 sub exists {
     my ($self, $key) = @_;
 
-    defined ($self->_get($key)->{file_name}) ? 1 : undef;
+    defined ($self->get($key)->{_id}) ? 1 : undef;
 }
 
 sub get {
@@ -52,13 +52,17 @@ sub add {
 
     my $key = $data->{_id};
     my $io  = $data->{_stream};
-# die <$io>
-    # if ($io->can('filename')) {
+
+    # do we want an update of the file here?
+    # for now just return the existing obejct
+    return $self->get($data->{_id}) if $self->exists($data->{_id});
+
+        # if ($io->can('filename')) {
         # my $filename = $io->filename;
-    $self->log->debug("adding a stream from the filename");
-    return $self->_add_filename($key, $io);
-    # }
-    # else ...
+        $self->log->debug("adding a stream from the filename");
+        return $self->_add_filename($key, $io);
+        # }
+        # else ...
 }
 
 sub delete {
@@ -73,7 +77,11 @@ sub delete {
 
     $gitlab->delete_file(
         $repo_id,
-        {file_path => $key},
+        {
+            file_path => $key,
+            branch_name => "master",
+            commit_message => "deleting file $key",
+        }
     );
 
     1;
@@ -108,13 +116,50 @@ sub _get {
     my $repo_id = $self->store->user . "/" . $self->name;
     url_encode($repo_id);
 
-    $gitlab->file(
+    my $file = $gitlab->file(
         $repo_id,
         {
             file_path => $key,
             ref => "master",
         }
     );
+
+    return +{} unless $file;
+
+    my $content_type = content_type($key);
+    my $created = "";
+    my $modified = "";
+
+    my $content = decode_base64($file->{content});
+
+    return {
+        _id          => $file->{file_path},
+        size         => $file->{size},
+        md5          => '',
+        content_type => $content_type,
+        created      => $created,
+        modified     => $modified,
+        _stream      => sub {
+            my $out   = shift;
+            my $bytes = 0;
+            my $data  = IO::File->new(\$content, "r")
+                || Catmandu::Error->throw("content from $file->{_id} not readable");
+
+            Catmandu::Error->throw("no io defined or not writable")
+                unless defined($out);
+
+            while (!$data->eof) {
+                my $buffer;
+                $data->read($buffer, 1024);
+                $bytes += $out->write($buffer);
+            }
+
+            $out->close();
+            $data->close();
+
+            $bytes;
+        }
+    };
 }
 
 sub _add_filename {
@@ -144,8 +189,6 @@ sub _add_filename {
 
 1;
 
-=pod
-
 =head1 NAME
 
 Catmandu::Store::File::GitLab::Bag - Index of all "files" in a Catmandu::Store::File::GitLab repository
@@ -158,8 +201,7 @@ Catmandu::Store::File::GitLab::Bag - Index of all "files" in a Catmandu::Store::
                         , baseurl   => 'http://localhost:8080/gitlab'
                         , username  => 'gitlabAdmin'
                         , password  => 'gitlabAdmin'
-                        , namespace => 'demo'
-                        , purge     => 1);
+                        , namespace => 'demo');
 
     my $index = $store->index;
 
