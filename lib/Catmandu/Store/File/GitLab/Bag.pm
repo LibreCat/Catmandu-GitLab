@@ -200,12 +200,11 @@ Catmandu::Store::File::GitLab::Bag - Index of all "files" in a Catmandu::Store::
     my $store = Catmandu->store('File::GitLab'
                         , baseurl   => 'http://localhost:8080/gitlab'
                         , username  => 'gitlabAdmin'
-                        , password  => 'gitlabAdmin'
-                        , namespace => 'demo');
+                        , password  => 'gitlabAdmin');
 
     my $index = $store->index;
 
-    # List all repository
+    # List all repositories
     $index->each(sub {
         my $container = shift;
 
@@ -258,8 +257,7 @@ Catmandu::Store::File::GitLab::Bag - Index of all "files" in a Catmandu::Store::
 
 A L<Catmandu::Store::File::GitLab::Bag> contains all "files" available in a
 L<Catmandu::Store::File::GitLab> FileStore repository. All methods of L<Catmandu::Bag>,
-L<Catmandu::FileBag::Index> and L<Catmandu::Droppable> are
-implemented.
+L<Catmandu::FileBag::Index> and L<Catmandu::Droppable> are implemented.
 
 Every L<Catmandu::Bag> is also an L<Catmandu::Iterable>.
 
